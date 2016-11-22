@@ -78,8 +78,6 @@ make
 
 #### Compilation
 
-This would cross-compile the 32 and 64-bit windows versions.
-
 ```bash
 $ cd .../somedir/
 $ cd pj64raphnetraw/src
