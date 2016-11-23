@@ -84,12 +84,11 @@ EXPORT BOOL APIENTRY DllMain( HINSTANCE hModule, DWORD  ul_reason_for_call, LPVO
 			return FALSE;
 
 		sprintf(logfilename, "%s\\%s\\raphnetraw.log", getenv("homedrive"), getenv("homepath"));
-		logfptr = fopen(logfilename, "wct");
+		logfptr = fopen(logfilename, "act");
 
 		DebugWriteA("*** DLL Attach | built on " __DATE__ " at " __TIME__")\n");
 		ZeroMemory( &g_strEmuInfo, sizeof(g_strEmuInfo) );
 		g_strEmuInfo.hinst = hModule;
-		DebugWriteA("  (compiled in ANSI mode, language detection DISABLED.)\n");
 		g_strEmuInfo.Language = 0;
 		InitializeCriticalSection( &g_critical );
 		gcn64_handle = NULL;
@@ -163,7 +162,11 @@ EXPORT void CALL DllTest ( HWND hParent )
 }
 #endif
 
+#if (SPECS_VERSION < 0x0101)
+EXPORT void CALL InitiateControllers( void *hMainWindow, CONTROL Controls[4])
+#else
 EXPORT void CALL InitiateControllers( CONTROL_INFO ControlInfo)
+#endif
 {
 	int i;
 	struct gcn64_list_ctx * lctx;
@@ -191,9 +194,7 @@ EXPORT void CALL InitiateControllers( CONTROL_INFO ControlInfo)
 			DebugMessage(M64MSG_ERROR, "Could not open gcn64 device\n");
 		}
 
-		gcn64lib_suspendPolling(gcn64_handle, 1);
-
-		DebugMessage(M64MSG_INFO, "Using USB device 0x%04x:0x%04x serial '%ls' name '%ls'",
+		DebugMessage(M64MSG_INFO, "Using USB device 0x%04x:0x%04x serial '%ls' name '%ls'\n",
 			inf.usb_vid, inf.usb_pid, inf.str_serial, inf.str_prodname);
 
 		break;
@@ -204,15 +205,24 @@ EXPORT void CALL InitiateControllers( CONTROL_INFO ControlInfo)
 		DebugMessage(M64MSG_INFO, "No adapters detected.\n");
 	}
 
-    g_strEmuInfo.hMainWindow   = ControlInfo.hMainWindow;
+#if (SPECS_VERSION < 0x0101)
+	g_strEmuInfo.hMainWindow = hMainWindow;
+#else
+    g_strEmuInfo.hMainWindow = ControlInfo.hMainWindow;
+#endif
 
 	EnterCriticalSection( &g_critical );
 
 
 	if (gcn64_handle) {
 		for (i=0; i<4; i++) {
+#if (SPECS_VERSION < 0x0101)
+			Controls[i].RawData = 1;
+			Controls[i].Present = 1;
+#else
 			ControlInfo.Controls[i].RawData = 1;
 			ControlInfo.Controls[i].Present = 1;
+#endif
 		}
 	}
 
@@ -226,6 +236,7 @@ EXPORT void CALL InitiateControllers( CONTROL_INFO ControlInfo)
 EXPORT void CALL RomOpen (void)
 {
 	DebugWriteA("CALLED: RomOpen\n");
+	gcn64lib_suspendPolling(gcn64_handle, 1);
 
 	return;
 }
@@ -233,6 +244,8 @@ EXPORT void CALL RomOpen (void)
 EXPORT void CALL RomClosed(void)
 {
 	DebugWriteA("CALLED: RomClosed\n");
+	gcn64lib_suspendPolling(gcn64_handle, 0);
+
 	return;
 }
 
@@ -331,6 +344,10 @@ EXPORT void CALL CloseDLL (void)
 
 	if (g_strEmuInfo.fInitialisedPlugin) {
 		if (gcn64_handle) {
+			/* RomClosed() should have done this, but just
+			   in case it is not always called, do this again here. */
+			gcn64lib_suspendPolling(gcn64_handle, 0);
+
 			gcn64_closeDevice(gcn64_handle);
 		}
 		g_strEmuInfo.fInitialisedPlugin = 0;
