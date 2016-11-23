@@ -26,3 +26,37 @@ N-Rage`s Direct-Input8 V2 1.80a
 NRage_DInput8_V2.dll
 Type: 4
 Version: 0x0100
+
+-- Project 64 v1.5
+
+Adaptoid Plugin v1.0
+Adaptoid_v1_0.dll
+Type: 4
+Spec version: 0x0100
+
+Jabo's DirectInput7 1.5
+Jabo_DInput.dll
+Type: 4
+Spec version: 0x0100
+
+N-Rage`s Direct-Input8 V2 1.80a
+NRage_DInput8_V2.dll
+Type: 4
+Spec version: 0x0100
+
+-- Project 64 v1.4
+
+Adaptoid Plugin v1.0
+Adaptoid_v1_0.dll
+Type: 4
+Spec version: 0x0100
+
+Jabo's DirectInput7 1.40
+Jabo_DInput.dll
+Type: 4
+Spec version: 0x0100
+
+N-Rage`s Direct-Input8 1.61
+NRage_DInput8.dll
+Type: 4
+Spec version: 0x0100
