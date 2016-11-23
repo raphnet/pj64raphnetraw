@@ -20,11 +20,14 @@ Source code is available on the project homepage and on GitHub.
 
 ## Using the plugin
 
-After compiling (or using the binary distribution) simply copy the following
-DLL files to "Project64 installation directory"/Plugin/Input:
+After compiling (or using the binary distribution) two .DLL files must be copied to specific
+locations.
 
-* pj64raphnetraw.dll
-* libhidapi-0.dll
+1. Copy the following file to `"Project64 installation directory"`/`Plugin`/`Input`:
+  * pj64raphnetraw.dll
+
+2. Copy the following file to `"Project64 installation directory"` (i.e. The one with a .EXE)
+  * libhidapi-0.dll
 
 Then in project64, go to `menu bar` -> `Options` -> `Settings` -> `Plugins`. Next in the
 `Input (controller) plugin` dropdown, select "raphnetraw for Project64 version xx.xx".
