@@ -50,6 +50,7 @@ CRITICAL_SECTION g_critical;		// our critical section semaphore
 
 #define M64MSG_INFO		0
 #define M64MSG_ERROR	1
+#define M64MSG_WARNING	2
 
 static void DebugMessage(int type, const char *message, ...)
 {
@@ -302,6 +303,29 @@ EXPORT void CALL ReadController( int Control, BYTE * Command )
 			int rx_len = Command[1];
 			int res;
 
+			// When a CIC challenge took place in CPifRam::PifRamWrite(), the pif ram
+			// contains a bunch 0xFF followed by 0x00 at offsets 46 and 47. Offset
+			// 48 onwards contains the challenge answer.
+			//
+			// Then when CPifRam::PifRamRead() is called, the 0xFF bytes are be skipped
+			// up to the two 0x00 bytes that increase the channel to 2. Then the
+			// challenge answer is (incorrectly) processed as if it were commands
+			// for the third controller.
+			//
+			// This cause issues with the raphnetraw plugin since it modifies pif ram
+			// to store the result or command error flags. This corrupts the reponse
+			// and leads to challenge failure.
+			//
+			// As I know of no controller commands above 0x03, the filter below guards
+			// against this condition...
+			//
+			if (Control == 2 && Command[2] > 0x03) {
+				DebugMessage(M64MSG_WARNING, "Invalid controller command\n");
+
+				LeaveCriticalSection( &g_critical );
+				return;
+			}
+
 			res = gcn64lib_rawSiCommand(gcn64_handle,
 									Control,		// Channel
 									Command + 2,	// TX data
@@ -317,8 +341,10 @@ EXPORT void CALL ReadController( int Control, BYTE * Command )
 				//
 				// Diagrams 1.2-1.4 shows that lower bits are preserved (i.e. The length
 				// byte is not completely replaced).
-				Command[1] &= 0xC0;
+				Command[1] &= ~0xC0;
 				Command[1] |= 0x80;
+			} else {
+				Command[1] &= ~0xC0;
 			}
 		}
 
@@ -350,6 +376,7 @@ EXPORT void CALL CloseDLL (void)
 
 			gcn64_closeDevice(gcn64_handle);
 		}
+		gcn64_handle = NULL;
 		g_strEmuInfo.fInitialisedPlugin = 0;
 	}
 
