@@ -33,6 +33,7 @@ static int prepareHeap();
 HANDLE g_hHeap = NULL;				// Handle to our heap
 FILE *logfptr = NULL;
 static gcn64_hdl_t gcn64_handle = NULL;
+static int g_adapter_n_channels = 2;
 
 // Types //
 typedef struct _EMULATOR_INFO
@@ -216,7 +217,10 @@ EXPORT void CALL InitiateControllers( CONTROL_INFO ControlInfo)
 
 
 	if (gcn64_handle) {
-		for (i=0; i<4; i++) {
+		g_adapter_n_channels = gcn64_info_supported_channels(&inf);
+		DebugMessage(M64MSG_INFO, "Adapter supports %d raw channels\n", g_adapter_n_channels);
+
+		for (i=0; i<g_adapter_n_channels; i++) {
 #if (SPECS_VERSION < 0x0101)
 			Controls[i].RawData = 1;
 			Controls[i].Present = 1;
