@@ -1,3 +1,10 @@
+2016-11-26: Version 0.9.3
+	- Only handle channels supported by the adapter. This increases
+	  performance (reduces lag) by preventing meaningless attempts to
+	  communicate with controllers connected to non-existing ports on the
+	  adapter. It also fixes issues where games would see more than one
+	  controller was present.
+
 2016-11-24: Version 0.9.2
 	- Protect against invalid commands received from emulator. This fixes
 	  some games that failed to start with a "Break point found" message.
