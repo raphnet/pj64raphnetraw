@@ -10,7 +10,7 @@ HIDAPI_LIBS=-L$(HIDAPI_BASE)/windows/.libs/ -lhidapi
 CFLAGS=-O3 -flto -Wall -ffast-math -fno-strict-aliasing -fvisibility=hidden -fno-PIC $(HIDAPI_CFLAGS) -MD -MP -mwindows -DSPECS_VERSION=0x0100
 LDFLAGS=-MD -MP -shared $(HIDAPI_LIBS) -mwindows
 
-OBJS=plugin.o gcn64lib.o gcn64.o hexdump.o
+OBJS=plugin_front.o plugin_back.o gcn64lib.o gcn64.o hexdump.o
 
 all: $(PLUGIN)
 
