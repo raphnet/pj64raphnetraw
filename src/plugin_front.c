@@ -171,6 +171,12 @@ EXPORT void CALL InitiateControllers( CONTROL_INFO ControlInfo)
 	if( !prepareHeap())
 		return;
 
+#if (SPECS_VERSION < 0x0101)
+	g_strEmuInfo.hMainWindow = hMainWindow;
+#else
+    g_strEmuInfo.hMainWindow = ControlInfo.hMainWindow;
+#endif
+
 	if (!g_strEmuInfo.fInitialisedPlugin) {
 		pb_init(DebugMessage);
 	}
@@ -179,14 +185,9 @@ EXPORT void CALL InitiateControllers( CONTROL_INFO ControlInfo)
 
 	if (n_controllers <= 0) {
 		DebugMessage(M64MSG_ERROR, "No adapters detected.\n");
+		MessageBox( g_strEmuInfo.hMainWindow, "raphnetraw: Adapter not detected", "Warning", MB_OK | MB_ICONWARNING);
 		return;
 	}
-
-#if (SPECS_VERSION < 0x0101)
-	g_strEmuInfo.hMainWindow = hMainWindow;
-#else
-    g_strEmuInfo.hMainWindow = ControlInfo.hMainWindow;
-#endif
 
 	EnterCriticalSection( &g_critical );
 
