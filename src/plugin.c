@@ -217,7 +217,7 @@ EXPORT void CALL InitiateControllers( CONTROL_INFO ControlInfo)
 
 
 	if (gcn64_handle) {
-		g_adapter_n_channels = gcn64_info_supported_channels(&inf);
+		g_adapter_n_channels = inf.caps.n_raw_channels;
 		DebugMessage(M64MSG_INFO, "Adapter supports %d raw channels\n", g_adapter_n_channels);
 
 		for (i=0; i<g_adapter_n_channels; i++) {
