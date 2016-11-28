@@ -28,15 +28,18 @@
 #include "gcn64.h"
 #include "gcn64lib.h"
 #include "version.h"
-#define ENABLE_TIMING
+//#define ENABLE_TIMING
 
 #ifdef ENABLE_TIMING
 #include <sys/time.h>
+
+#if defined(__MINGW32__) || defined(__MINGW64__)
+#error Timing not supported under Windows
+#endif
 #endif
 
-//#define TIME_RAW_IO
-#define TIME_COMMAND_TO_READ
-
+#define TIME_RAW_IO
+//#define TIME_COMMAND_TO_READ
 static void nodebug(int l, const char *m, ...) { }
 
 static pb_debugFunc DebugMessage = nodebug;
