@@ -1,3 +1,9 @@
+2016-12-03: Version 0.9.4
+	- Improved structure and separation for easier maintenance of the code
+	  shared between the Project 64 and mupen64plus versions of this plugin.
+	- Support for the upcoming 3.4.x adapter firmware (will provide even lower
+	latency/overhead)
+
 2016-11-26: Version 0.9.3
 	- Only handle channels supported by the adapter. This increases
 	  performance (reduces lag) by preventing meaningless attempts to
