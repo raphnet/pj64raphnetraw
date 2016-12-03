@@ -23,12 +23,24 @@
  *   Free Software Foundation, Inc.,
  *   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
+
+/*
+ * plugin_back.c : Plugin back code (in contrast to the "front" emulator interface
+ *
+ * Revision history:
+ * 	28 Nov 2016 : Initial version
+ * 	 1 Dec 2016 : Switch to block IO api
+ *
+ */
+
 #include <stdio.h>
 #include "plugin_back.h"
 #include "gcn64.h"
 #include "gcn64lib.h"
 #include "version.h"
-//#define ENABLE_TIMING
+#include "hexdump.h"
+
+#undef ENABLE_TIMING
 
 #ifdef ENABLE_TIMING
 #include <sys/time.h>
@@ -39,7 +51,11 @@
 #endif
 
 #define TIME_RAW_IO
-//#define TIME_COMMAND_TO_READ
+#undef TIME_COMMAND_TO_READ
+
+//#define TRACE_BLOCK_IO
+
+
 static void nodebug(int l, const char *m, ...) { }
 
 static pb_debugFunc DebugMessage = nodebug;
@@ -181,15 +197,22 @@ int pb_controllerCommand(int Control, unsigned char *Command)
 	// the results later in readController.
 	//
 	// But unlike what I expected, controllerCommand is NOT always called
-	// before readController... When it is, readController() is only called
-	// about 100us later. Not worth pursing for now.
+	// before readController... Will investigate later.
 #ifdef TIME_COMMAND_TO_READ
 	timing(1, NULL);
 #endif
 	return 0;
 }
 
-int pb_readController(int Control, unsigned char *Command)
+/*
+ * This is the way first releases worked. Each transaction was processed
+ * separately. The round-trip time being of about 2ms each time... For a
+ * 4 player game, that's 8 ms (out of 16ms at 60hz!) gone doing nothing. It
+ * gets even worse if rumble packs and the like are involved...
+ *
+ * I'll keep this here for reference/debuging for a while.
+ */
+static int pb_readController_compat(int Control, unsigned char *Command)
 {
 #ifdef TIME_COMMAND_TO_READ
 	timing(0, "Command to Read");
@@ -296,3 +319,144 @@ int pb_readController(int Control, unsigned char *Command)
 	return 0;
 }
 
+#define MAX_OPS	64
+
+static struct blockio_op biops[MAX_OPS];
+static int n_ops = 0;
+
+int pb_readController(int Control, unsigned char *Command)
+{
+	int res;
+
+	// On adapters supporting it, the new block io API is
+	// faster. If the adapter does not support it (pre 3.4.x firmware)
+	// it is emulated in gcn64lib.c
+	//
+	// Reading the status of two controllers:
+	//
+	// Without blockIO.: 4488 us
+	// With blockIO....: 2868 us
+	//
+
+//	return pb_readController_compat(Control, Command);
+
+	if (Control >= 0 && Control < g_adapter_n_channels) {
+
+		// When a CIC challenge took place in update_pif_write(), the pif ram
+		// contains a bunch 0xFF followed by 0x00 at offsets 46 and 47. Offset
+		// 48 onwards contains the challenge answer.
+		//
+		// Then when update_pif_read() is called, the 0xFF bytes are be skipped
+		// up to the two 0x00 bytes that increase the channel to 2. Then the
+		// challenge answer is (incorrectly) processed as if it were commands
+		// for the third controller.
+		//
+		// This cause issues with the raphnetraw plugin since it modifies pif ram
+		// to store the result or command error flags. This corrupts the reponse
+		// and leads to challenge failure.
+		//
+		// As I know of no controller commands above 0x03, the filter below guards
+		// against this condition...
+		//
+		if (Control == 2 && Command[2] > 0x03) {
+			DebugMessage(PB_MSG_WARNING, "Invalid controller command\n");
+			return 0;
+		}
+
+		// When Mario Kart 64 uses a controller pak, such PIF ram content
+		// occurs:
+		//
+		// ff 03 21 02 01 f7 ff ff
+		// ff ff ff ff ff ff ff ff
+		// ff ff ff ff ff ff ff ff
+		// ff ff ff ff ff ff ff ff
+		// ff ff ff ff ff ff ff 21
+		// fe 00 00 00 00 00 00 00
+		// 00 00 00 00 00 00 00 00
+		// 00 00 00 00 00 00 00 00
+		//
+		// It results in this:
+		//  - Transmission of 3 bytes with a 33 bytes return on channel 0,
+		//  - Transmission of 33 bytes with 254 bytes in return on channel 1!?
+		//
+		// Obviously the second transaction is an error. The 0xFE (254) that follows
+		// is where processing should actually stop. This happens to be an invalid length detectable
+		// by looking at the two most significant bits..
+		//
+		if (Command[0] & 0xC0 || Command[1] & 0xC0) {
+			DebugMessage(PB_MSG_WARNING, "Ignoring invalid io operation (T: 0x%02x, R: 0x%02x)",
+				Command[0], Command[1]);
+			return 0;
+		}
+
+		if (n_ops >= MAX_OPS) {
+			DebugMessage(PB_MSG_ERROR, "Too many io ops\n");
+		} else {
+			biops[n_ops].chn = Control;
+			biops[n_ops].tx_len = Command[0] & BIO_RXTX_MASK;
+			biops[n_ops].rx_len = Command[1] & BIO_RXTX_MASK;
+			biops[n_ops].tx_data = Command + 2;
+			biops[n_ops].rx_data = Command + 2 + biops[n_ops].tx_len;
+
+			if (biops[n_ops].tx_len == 0 || biops[n_ops].rx_len == 0) {
+				DebugMessage(PB_MSG_WARNING, "TX or RX was zero");
+				return 0;
+			}
+
+			n_ops++;
+		}
+	}
+
+	// Called with -1 at the end of PIF ram. Do the actual transaction here.
+	if (Control == -1) {
+		if (n_ops > 0) {
+			int i;
+
+#ifdef TRACE_BLOCK_IO
+			for (i=0; i<n_ops; i++) {
+				printf("Before blockIO: op %d, chn: %d, : tx: 0x%02x, rx: 0x%02x, data: ", i, biops[i].chn,
+							biops[i].tx_len, biops[i].rx_len);
+				printHexBuf(biops[i].tx_data, biops[i].tx_len);
+			}
+#endif
+
+#ifdef TIME_RAW_IO
+			timing(1, NULL);
+#endif
+			res = gcn64lib_blockIO(gcn64_handle, biops, n_ops);
+#ifdef TIME_RAW_IO
+			timing(0, "blockIO");
+#endif
+
+			if (res == 0) {
+				// biops rx_data pointed into PIFram so data is there. But we need
+				// to patch the RX length parameters (the two most significant bits
+				// are error bits such as timeout..)
+				for (i=0; i<n_ops; i++) {
+					// in PIFram, the read length is one byte before the tx data. A rare
+					// occasion to use a negative array index ;)
+					biops[i].tx_data[-1] = biops[i].rx_len;
+
+#ifdef TRACE_BLOCK_IO
+					printf("After blockIO: op %d, chn: %d, : tx: 0x%02x, rx: 0x%02x, data: ", i, biops[i].chn,
+							biops[i].tx_len, biops[i].rx_len);
+					if (biops[i].rx_len & BIO_RX_LEN_TIMEDOUT) {
+						printf("Timeout\n");
+					} else if (biops[i].rx_len & BIO_RX_LEN_PARTIAL) {
+						printf("Incomplete\n");
+					} else {
+						printHexBuf(biops[i].rx_data, biops[i].rx_len);
+					}
+#endif
+				}
+			} else {
+				// For debugging
+				//exit(1);
+			}
+			n_ops = 0;
+		}
+		return 0;
+	}
+
+	return 0;
+}
