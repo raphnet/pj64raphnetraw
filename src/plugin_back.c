@@ -1,6 +1,6 @@
 /* mupen64plus-input-raphnetraw
  *
- * Copyright (C) 2016 Raphael Assenat
+ * Copyright (C) 2016-2017 Raphael Assenat
  *
  * An input plugin that lets the game under emulation communicate with
  * the controllers directly using the direct controller communication
@@ -50,17 +50,48 @@
 #endif
 #endif
 
-#define TIME_RAW_IO
+#undef TIME_RAW_IO
 #undef TIME_COMMAND_TO_READ
 
-//#define TRACE_BLOCK_IO
+#undef TRACE_BLOCK_IO
+// Filter
+#define EXTENSION_RW_ONLY 0
 
+
+#define MAX_ADAPTERS	4
+#define MAX_CHANNELS	4
 
 static void nodebug(int l, const char *m, ...) { }
 
 static pb_debugFunc DebugMessage = nodebug;
-static int g_adapter_n_channels = 2;
-static gcn64_hdl_t gcn64_handle = NULL;
+
+
+
+#define MAX_OPS	64
+
+struct adapter {
+	gcn64_hdl_t handle;
+	struct gcn64_info inf;
+	struct blockio_op biops[MAX_OPS];
+	int n_ops;
+};
+
+static int g_n_adapters = 0;
+struct adapter g_adapters[MAX_ADAPTERS] = { };
+
+struct rawChannel {
+	struct adapter *adapter;
+	int chn;
+};
+/* Multiple adapters are supported, some are single player, others
+ * two-player. As they are discovered during scan, their
+ * channels (corresponding to physical controller ports) are added
+ * to this table. Then, when plugin_front() calls functions in this
+ * files with a specified channel, the channel is the index in this
+ * table.
+ */
+static struct rawChannel g_channels[MAX_CHANNELS] = { };
+static int g_n_channels = 0;
 
 int pb_init(pb_debugFunc debugFn)
 {
@@ -71,22 +102,33 @@ int pb_init(pb_debugFunc debugFn)
 
 int pb_shutdown(void)
 {
-	if (gcn64_handle) {
-		/* RomClosed() should have done this, but just
-		   in case it is not always called, do this again here. */
-		gcn64lib_suspendPolling(gcn64_handle, 0);
+	int i;
 
-		gcn64_closeDevice(gcn64_handle);
+	for (i=0; i<g_n_adapters; i++) {
+		if (g_adapters[i].handle) {
+			/* RomClosed() should have done this, but just
+			   in case it is not always called, do this again here. */
+			gcn64lib_suspendPolling(g_adapters[i].handle, 0);
+
+			gcn64_closeDevice(g_adapters[i].handle);
+		}
 	}
 
 	gcn64_shutdown();
+	g_n_channels = 0;
+	g_n_adapters = 0;
+
 	return 0;
 }
 
+/**
+ * \return The number of channels available.
+ */
 int pb_scanControllers(void)
 {
 	struct gcn64_list_ctx * lctx;
-	struct gcn64_info inf;
+	int i, j;
+	struct adapter *adap;
 
 	lctx = gcn64_allocListCtx();
 	if (!lctx) {
@@ -94,45 +136,82 @@ int pb_scanControllers(void)
 		return 0;
 	}
 
-	/* This uses the first device we are able to open. TODO : Configurable per serial */
-	while (gcn64_listDevices(&inf, lctx)) {
-		gcn64_handle = gcn64_openDevice(&inf);
-		if (!gcn64_handle) {
-			DebugMessage(PB_MSG_ERROR, "Could not open gcn64 device\n");
+	/* Pass 1: Fill g_adapters[] with the adapters present on the system. */
+	g_n_adapters = 0;
+	adap = &g_adapters[g_n_adapters];
+	while (gcn64_listDevices(&adap->inf, lctx)) {
+
+		adap->handle = gcn64_openDevice(&adap->inf);
+		if (!adap->handle) {
+			DebugMessage(PB_MSG_ERROR, "Could not open gcn64 device serial '%ls'. Skipping it.\n", adap->inf.str_serial);
+			continue;
 		}
 
-		DebugMessage(PB_MSG_INFO, "Using USB device 0x%04x:0x%04x serial '%ls' name '%ls'",
-						inf.usb_vid, inf.usb_pid, inf.str_serial, inf.str_prodname);
+		DebugMessage(PB_MSG_INFO, "Found USB device 0x%04x:0x%04x serial '%ls' name '%ls'",
+						adap->inf.usb_vid, adap->inf.usb_pid, adap->inf.str_serial, adap->inf.str_prodname);
+		DebugMessage(PB_MSG_INFO, "Adapter supports %d raw channels", adap->inf.caps.n_raw_channels);
 
-		break;
+		g_n_adapters++;
+		if (g_n_adapters >= MAX_ADAPTERS)
+			break;
+
+		adap = &g_adapters[g_n_adapters];
 	}
 	gcn64_freeListCtx(lctx);
 
-	if (gcn64_handle) {
+	/* Pass 2: Fill the g_channel[] array with the available raw channels.
+	 * For instance, if there are adapter A, B and C (where A and C are single-player
+	 * and B is dual-player), we get this:
+	 *
+	 * [0] = Adapter A, raw channel 0
+	 * [1] = Adapter B, raw channel 0
+	 * [2] = Adapter B, raw channel 1
+	 * [3] = Adapter C, raw channel 0
+	 *
+	 * */
+	for (i=0; i<g_n_adapters; i++) {
+		struct adapter *adap = &g_adapters[i];
 
-		g_adapter_n_channels = inf.caps.n_raw_channels;
-		DebugMessage(PB_MSG_INFO, "Adapter supports %d raw channels", g_adapter_n_channels);
+		if (adap->inf.caps.n_raw_channels <= 0)
+			continue;
 
-		return g_adapter_n_channels;
+		for (j=0; j<adap->inf.caps.n_raw_channels; j++) {
+			if (g_n_channels >= MAX_CHANNELS) {
+				return g_n_channels;
+			}
+			g_channels[g_n_channels].adapter = adap;
+			g_channels[g_n_channels].chn = j;
+			DebugMessage(PB_MSG_INFO, "Channel %d: Adapter '%ls' raw channel %d", g_n_channels, adap->inf.str_serial, j);
+			g_n_channels++;
+		}
 	}
 
-
-	return 0;
+	return g_n_channels;
 }
 
 int pb_romOpen(void)
 {
-	if (gcn64_handle) {
-		gcn64lib_suspendPolling(gcn64_handle, 1);
+	int i;
+
+	for (i=0; i<MAX_ADAPTERS; i++) {
+		if (g_adapters[i].handle) {
+			gcn64lib_suspendPolling(g_adapters[i].handle, 1);
+		}
 	}
+
 	return 0;
 }
 
 int pb_romClosed(void)
 {
-	if (gcn64_handle) {
-		gcn64lib_suspendPolling(gcn64_handle, 0);
+	int i;
+
+	for (i=0; i<MAX_ADAPTERS; i++) {
+		if (g_adapters[i].handle) {
+			gcn64lib_suspendPolling(g_adapters[i].handle, 0);
+		}
 	}
+
 	return 0;
 }
 
@@ -204,258 +283,177 @@ int pb_controllerCommand(int Control, unsigned char *Command)
 	return 0;
 }
 
-/*
- * This is the way first releases worked. Each transaction was processed
- * separately. The round-trip time being of about 2ms each time... For a
- * 4 player game, that's 8 ms (out of 16ms at 60hz!) gone doing nothing. It
- * gets even worse if rumble packs and the like are involved...
- *
- * I'll keep this here for reference/debuging for a while.
- */
-static int pb_readController_compat(int Control, unsigned char *Command)
+static int pb_performIo(void)
 {
-#ifdef TIME_COMMAND_TO_READ
-	timing(0, "Command to Read");
-#endif
-	if (Control != -1 && Command) {
+	struct adapter *adap;
+	struct blockio_op *biops;
+	int j, i, res;
 
-		// Command structure
-		// based on LaC's n64 hardware dox... v0.8 (unofficial release)
-		//
-		// Byte 0: nBytes to transmit
-		// Byte 1: nBytes to receive
-		// Byte 2: TX data start (first byte is the command)
-		// Byte 2+[tx_len]: RX data start
-		//
-		// Request info (status):
-		//
-		// tx[1] = {0x00 }, expecting 3 bytes
-		//
-		// Get button status:
-		//
-		// tx[1] = {0x01 }, expecting 4 bytes
-		//
-		// Rumble commands: (Super smash bros)
-		//
-		// tx[35] = {0x03 0x80 0x01 0xfe 0xfe 0xfe 0xfe 0xfe 0xfe 0xfe 0xfe 0xfe
-		// 			0xfe 0xfe 0xfe 0xfe 0xfe 0xfe 0xfe 0xfe 0xfe 0xfe 0xfe 0xfe 0xfe
-		// 			0xfe 0xfe 0xfe 0xfe 0xfe 0xfe 0xfe 0xfe 0xfe 0xfe }, expecting 1 byte
-		//
-		// tx[3] = {0x02 0x80 0x01 }, expecting 33 bytes
-		//
-		// Memory card commands: (Mario Kart 64)
-		//
-		// tx[3] = {0x02 0x00 0x35 }, expecting 33 bytes
-		// tx[35] = {0x03 0x02 0x19 0x00 0x71 0xbf 0x95 0xf5 0xfb 0xd7 0xc1 0x00 0x00
-		// 			0x00 0x03 0x00 0x03 0x00 0x03 0x00 0x03 0x00 0x03 0x00 0x03 0x00
-		// 			0x03 0x00 0x03 0x00 0x03 0x00 0x03 0x00 0x03 }, expecting 1 byte
-		if (gcn64_handle) {
-			int tx_len = Command[0];
-			int rx_len = Command[1];
-			int res;
+	for (j=0; j<g_n_channels; j++)
+	{
+		adap = &g_adapters[j];
+		biops = adap->biops;
 
-#ifdef _DEBUG
-			debug_raw_commands_in(Command, Control);
-#endif
+		/* Skip adapters that do not have IO operations queued. */
+		if (adap->n_ops <= 0)
+			continue;
 
-			if (!rx_len) {
-				return 0;
-			}
-
-			// When a CIC challenge took place in update_pif_write(), the pif ram
-			// contains a bunch 0xFF followed by 0x00 at offsets 46 and 47. Offset
-			// 48 onwards contains the challenge answer.
-			//
-			// Then when update_pif_read() is called, the 0xFF bytes are be skipped
-			// up to the two 0x00 bytes that increase the channel to 2. Then the
-			// challenge answer is (incorrectly) processed as if it were commands
-			// for the third controller.
-			//
-			// This cause issues with the raphnetraw plugin since it modifies pif ram
-			// to store the result or command error flags. This corrupts the reponse
-			// and leads to challenge failure.
-			//
-			// As I know of no controller commands above 0x03, the filter below guards
-			// against this condition...
-			//
-			if (Control == 2 && Command[2] > 0x03) {
-				DebugMessage(PB_MSG_WARNING, "Invalid controller command\n");
-				return 0;
-			}
-#ifdef TIME_RAW_IO
-			timing(1, NULL);
-#endif
-			res = gcn64lib_rawSiCommand(gcn64_handle,
-									Control,		// Channel
-									Command + 2,	// TX data
-									tx_len,		// TX data len
-									Command + 2 + tx_len,	// RX data
-									rx_len		// TX data len
-								);
-#ifdef TIME_RAW_IO
-			timing(0, "rawCommand");
-#endif
-
-			if (res <= 0) {
-				// 0x00 - no error, operation successful.
-				// 0x80 - error, device not present for specified command.
-				// 0x40 - error, unable to send/recieve the number bytes for command type.
-				//
-				// Diagrams 1.2-1.4 shows that lower bits are preserved (i.e. The length
-				// byte is not completely replaced).
-				Command[1] &= ~0xC0;
-				Command[1] |= 0x80;
-			} else {
-				// Success. Make sure error bits are clear, if any.
-				Command[1] &= ~0xC0;
-			}
-
-#ifdef _DEBUG
-			debug_raw_commands_out(Command, Control);
-#endif
+#ifdef TRACE_BLOCK_IO
+		for (i=0; i<adap->n_ops; i++) {
+			if (EXTENSION_RW_ONLY && (biops[i].tx_data[0] < 0x02))
+				continue;
+			printf("Before blockIO: op %d, chn: %d, : tx: 0x%02x, rx: 0x%02x, data: ", i, biops[i].chn,
+						biops[i].tx_len, biops[i].rx_len);
+			printHexBuf(biops[i].tx_data, biops[i].tx_len);
 		}
-	}
+#endif
 
+#ifdef TIME_RAW_IO
+		timing(1, NULL);
+#endif
+		res = gcn64lib_blockIO(adap->handle, biops, adap->n_ops);
+#ifdef TIME_RAW_IO
+		timing(0, "blockIO");
+#endif
+
+		if (res == 0) {
+			// biops rx_data pointed into PIFram so data is there. But we need
+			// to patch the RX length parameters (the two most significant bits
+			// are error bits such as timeout..)
+			for (i=0; i<adap->n_ops; i++) {
+				// in PIFram, the read length is one byte before the tx data. A rare
+				// occasion to use a negative array index ;)
+				biops[i].tx_data[-1] = biops[i].rx_len;
+
+#ifdef TRACE_BLOCK_IO
+				if (EXTENSION_RW_ONLY && (biops[i].tx_data[0] < 0x02))
+					continue;
+
+				printf("After blockIO: op %d, chn: %d, : tx: 0x%02x, rx: 0x%02x, data: ", i, biops[i].chn,
+						biops[i].tx_len, biops[i].rx_len);
+				if (biops[i].rx_len & BIO_RX_LEN_TIMEDOUT) {
+					printf("Timeout\n");
+				} else if (biops[i].rx_len & BIO_RX_LEN_PARTIAL) {
+					printf("Incomplete\n");
+				} else {
+					printHexBuf(biops[i].rx_data, biops[i].rx_len);
+				}
+#endif
+			}
+		} else {
+			// For debugging
+			//exit(1);
+		}
+
+		adap->n_ops = 0;
+	}
 	return 0;
+
+
 }
 
-#define MAX_OPS	64
+static int pb_commandIsValid(int Control, unsigned char *Command)
+{
+	if (Control < 0 || Control >= g_n_channels) {
+		DebugMessage(PB_MSG_WARNING, "pb_readController called with Control=%d\n", Control);
+		return 0;
+	}
 
-static struct blockio_op biops[MAX_OPS];
-static int n_ops = 0;
+	if (!Command) {
+		DebugMessage(PB_MSG_WARNING, "pb_readController called with NULL Command pointer\n");
+		return 0;
+	}
+
+	// When a CIC challenge took place in update_pif_write(), the pif ram
+	// contains a bunch 0xFF followed by 0x00 at offsets 46 and 47. Offset
+	// 48 onwards contains the challenge answer.
+	//
+	// Then when update_pif_read() is called, the 0xFF bytes are be skipped
+	// up to the two 0x00 bytes that increase the channel to 2. Then the
+	// challenge answer is (incorrectly) processed as if it were commands
+	// for the third controller.
+	//
+	// This cause issues with the raphnetraw plugin since it modifies pif ram
+	// to store the result or command error flags. This corrupts the reponse
+	// and leads to challenge failure.
+	//
+	// As I know of no controller commands above 0x03, the filter below guards
+	// against this condition...
+	//
+	if (Control == 2 && Command[2] > 0x03) {
+		DebugMessage(PB_MSG_WARNING, "Invalid controller command\n");
+		return 0;
+	}
+
+	// When Mario Kart 64 uses a controller pak, such PIF ram content
+	// occurs:
+	//
+	// ff 03 21 02 01 f7 ff ff
+	// ff ff ff ff ff ff ff ff
+	// ff ff ff ff ff ff ff ff
+	// ff ff ff ff ff ff ff ff
+	// ff ff ff ff ff ff ff 21
+	// fe 00 00 00 00 00 00 00
+	// 00 00 00 00 00 00 00 00
+	// 00 00 00 00 00 00 00 00
+	//
+	// It results in this:
+	//  - Transmission of 3 bytes with a 33 bytes return on channel 0,
+	//  - Transmission of 33 bytes with 254 bytes in return on channel 1!?
+	//
+	// Obviously the second transaction is an error. The 0xFE (254) that follows
+	// is where processing should actually stop. This happens to be an invalid length detectable
+	// by looking at the two most significant bits..
+	//
+	if (Command[0] == 0xFE && Command[1] == 0x00) {
+		DebugMessage(PB_MSG_WARNING, "Ignoring invalid io operation (T: 0x%02x, R: 0x%02x)",
+			Command[0], Command[1]);
+		return 0;
+	}
+
+	return 1;
+}
 
 int pb_readController(int Control, unsigned char *Command)
 {
-	int res;
+	struct rawChannel *channel;
+	struct adapter *adap;
+	struct blockio_op *biops;
 
-	// On adapters supporting it, the new block io API is
-	// faster. If the adapter does not support it (pre 3.4.x firmware)
-	// it is emulated in gcn64lib.c
-	//
-	// Reading the status of two controllers:
-	//
-	// Without blockIO.: 4488 us
-	// With blockIO....: 2868 us
-	//
-
-//	return pb_readController_compat(Control, Command);
-
-	if (Control >= 0 && Control < g_adapter_n_channels) {
-
-		// When a CIC challenge took place in update_pif_write(), the pif ram
-		// contains a bunch 0xFF followed by 0x00 at offsets 46 and 47. Offset
-		// 48 onwards contains the challenge answer.
-		//
-		// Then when update_pif_read() is called, the 0xFF bytes are be skipped
-		// up to the two 0x00 bytes that increase the channel to 2. Then the
-		// challenge answer is (incorrectly) processed as if it were commands
-		// for the third controller.
-		//
-		// This cause issues with the raphnetraw plugin since it modifies pif ram
-		// to store the result or command error flags. This corrupts the reponse
-		// and leads to challenge failure.
-		//
-		// As I know of no controller commands above 0x03, the filter below guards
-		// against this condition...
-		//
-		if (Control == 2 && Command[2] > 0x03) {
-			DebugMessage(PB_MSG_WARNING, "Invalid controller command\n");
-			return 0;
-		}
-
-		// When Mario Kart 64 uses a controller pak, such PIF ram content
-		// occurs:
-		//
-		// ff 03 21 02 01 f7 ff ff
-		// ff ff ff ff ff ff ff ff
-		// ff ff ff ff ff ff ff ff
-		// ff ff ff ff ff ff ff ff
-		// ff ff ff ff ff ff ff 21
-		// fe 00 00 00 00 00 00 00
-		// 00 00 00 00 00 00 00 00
-		// 00 00 00 00 00 00 00 00
-		//
-		// It results in this:
-		//  - Transmission of 3 bytes with a 33 bytes return on channel 0,
-		//  - Transmission of 33 bytes with 254 bytes in return on channel 1!?
-		//
-		// Obviously the second transaction is an error. The 0xFE (254) that follows
-		// is where processing should actually stop. This happens to be an invalid length detectable
-		// by looking at the two most significant bits..
-		//
-		if (Command[0] & 0xC0 || Command[1] & 0xC0) {
-			DebugMessage(PB_MSG_WARNING, "Ignoring invalid io operation (T: 0x%02x, R: 0x%02x)",
-				Command[0], Command[1]);
-			return 0;
-		}
-
-		if (n_ops >= MAX_OPS) {
-			DebugMessage(PB_MSG_ERROR, "Too many io ops\n");
-		} else {
-			biops[n_ops].chn = Control;
-			biops[n_ops].tx_len = Command[0] & BIO_RXTX_MASK;
-			biops[n_ops].rx_len = Command[1] & BIO_RXTX_MASK;
-			biops[n_ops].tx_data = Command + 2;
-			biops[n_ops].rx_data = Command + 2 + biops[n_ops].tx_len;
-
-			if (biops[n_ops].tx_len == 0 || biops[n_ops].rx_len == 0) {
-				DebugMessage(PB_MSG_WARNING, "TX or RX was zero");
-				return 0;
-			}
-
-			n_ops++;
-		}
+	// Called with -1 at the end of PIF ram.
+	if (Control == -1) {
+		return pb_performIo();
 	}
 
-	// Called with -1 at the end of PIF ram. Do the actual transaction here.
-	if (Control == -1) {
-		if (n_ops > 0) {
-			int i;
-
-#ifdef TRACE_BLOCK_IO
-			for (i=0; i<n_ops; i++) {
-				printf("Before blockIO: op %d, chn: %d, : tx: 0x%02x, rx: 0x%02x, data: ", i, biops[i].chn,
-							biops[i].tx_len, biops[i].rx_len);
-				printHexBuf(biops[i].tx_data, biops[i].tx_len);
-			}
-#endif
-
-#ifdef TIME_RAW_IO
-			timing(1, NULL);
-#endif
-			res = gcn64lib_blockIO(gcn64_handle, biops, n_ops);
-#ifdef TIME_RAW_IO
-			timing(0, "blockIO");
-#endif
-
-			if (res == 0) {
-				// biops rx_data pointed into PIFram so data is there. But we need
-				// to patch the RX length parameters (the two most significant bits
-				// are error bits such as timeout..)
-				for (i=0; i<n_ops; i++) {
-					// in PIFram, the read length is one byte before the tx data. A rare
-					// occasion to use a negative array index ;)
-					biops[i].tx_data[-1] = biops[i].rx_len;
-
-#ifdef TRACE_BLOCK_IO
-					printf("After blockIO: op %d, chn: %d, : tx: 0x%02x, rx: 0x%02x, data: ", i, biops[i].chn,
-							biops[i].tx_len, biops[i].rx_len);
-					if (biops[i].rx_len & BIO_RX_LEN_TIMEDOUT) {
-						printf("Timeout\n");
-					} else if (biops[i].rx_len & BIO_RX_LEN_PARTIAL) {
-						printf("Incomplete\n");
-					} else {
-						printHexBuf(biops[i].rx_data, biops[i].rx_len);
-					}
-#endif
-				}
-			} else {
-				// For debugging
-				//exit(1);
-			}
-			n_ops = 0;
-		}
+	/* Check for out of bounds Control parameter, for
+	 * NULL Command and filter various invalid conditions. */
+	if (!pb_commandIsValid(Control, Command)) {
 		return 0;
+	}
+
+	/* Add the IO operation to the block io list of
+	 * the adapter serving this channel. */
+
+	channel = &g_channels[Control];
+	adap = channel->adapter;
+
+	if (adap->n_ops >= MAX_OPS) {
+		DebugMessage(PB_MSG_ERROR, "Too many io ops\n");
+	} else {
+		biops = adap->biops;
+
+		biops[adap->n_ops].chn = channel->chn; // Control;
+		biops[adap->n_ops].tx_len = Command[0] & BIO_RXTX_MASK;
+		biops[adap->n_ops].rx_len = Command[1] & BIO_RXTX_MASK;
+		biops[adap->n_ops].tx_data = Command + 2;
+		biops[adap->n_ops].rx_data = Command + 2 + biops[adap->n_ops].tx_len;
+
+		if (biops[adap->n_ops].tx_len == 0 || biops[adap->n_ops].rx_len == 0) {
+			DebugMessage(PB_MSG_WARNING, "TX or RX was zero");
+			return 0;
+		}
+
+		adap->n_ops++;
 	}
 
 	return 0;
