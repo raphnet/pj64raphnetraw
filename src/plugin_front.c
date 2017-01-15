@@ -1,5 +1,5 @@
 /* raphnetraw input plugin
- * (C) 2016 Raphael Assenat
+ * (C) 2016-2017 Raphael Assenat
  *
  * Based on the N-Rage`s Dinput8 Plugin
  * (C) 2002, 2006  Norbert Wladyka
