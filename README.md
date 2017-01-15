@@ -3,9 +3,9 @@
 This input plugin for project64 uses the direct controller access feature offered by raphnet N64 to USB
 adapters (versions 3 and up) to let the emulated game communicate with the controllers directly.
 
-* Perfect accuracy: The controller works exactly as it would on a N64 system, without any calibration or tweaking.
-* Rumble Pak and Controller Pak (mempak) support (and potentially other accesories too [not confirmed])
-* Support for other peripherals that connect to controller ports (eg: N64 mouse) [not confirmed]
+* Perfect accuracy: The controller stick works exactly as it would on a N64 system, without any calibration or tweaking.
+* Rumble Pak, Controller Pak (mempak), Transfer Pak and Bio sensor support.
+* N64 Mouse support and VRU support.
 * Low latency
 
 ## Project homepage
@@ -25,6 +25,7 @@ locations.
 
 1. Copy the following file to `"Project64 installation directory"`/`Plugin`/`Input`:
   * pj64raphnetraw.dll
+  * pj64raphnetraw_ports1and4.dll
 
 2. Copy the following file to `"Project64 installation directory"` (i.e. The one with a .EXE)
   * libhidapi-0.dll
