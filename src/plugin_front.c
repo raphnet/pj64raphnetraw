@@ -145,12 +145,19 @@ EXPORT void CALL GetDllInfo ( PLUGIN_INFO* PluginInfo )
 
 EXPORT void CALL DllAbout ( HWND hParent )
 {
-	char tmpbuf[128];
+	char tmpbuf[512];
+#ifdef PORTS_1_AND_4
+	const char *specialBuild = "\n* * * Special build * * *\nAdapter ports 1 and 2 -> N64 ports 1 and 4\n(For use with VRU in port 4 with two-player adapter)\n";
+#else
+	const char *specialBuild = "Standard version";
+#endif
 
 	DebugWriteA("CALLED: DllAbout\n");
 
-	sprintf(tmpbuf, PLUGIN_NAME" version %d.%d.%d (Compiled on "__DATE__")\n\n"
-					"by raphnet\n", VERSION_PRINTF_SPLIT(PLUGIN_VERSION));
+	snprintf(tmpbuf, sizeof(tmpbuf),
+					PLUGIN_NAME" version %d.%d.%d (Compiled on "__DATE__")\n"
+					"%s\n"
+					"by raphnet\n", VERSION_PRINTF_SPLIT(PLUGIN_VERSION), specialBuild);
 
 	MessageBox( hParent, tmpbuf, "About", MB_OK | MB_ICONINFORMATION);
 
