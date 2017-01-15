@@ -2,6 +2,7 @@ CC=i686-w64-mingw32-gcc
 LD=$(CC)
 
 PLUGIN=pj64raphnetraw.dll
+PLUGIN_P1AND4=pj64raphnetraw_ports1and4.dll
 
 HIDAPI_BASE=../../hidapi
 HIDAPI_CFLAGS=-I$(HIDAPI_BASE)/hidapi
@@ -11,12 +12,28 @@ CFLAGS=-O3 -flto -Wall -ffast-math -fno-strict-aliasing -fvisibility=hidden -fno
 LDFLAGS=-shared $(HIDAPI_LIBS) -mwindows
 
 OBJS=plugin_front.o plugin_back.o gcn64lib.o gcn64.o hexdump.o
+OBJS_STD=$(patsubst %.o,objs/%.o,$(OBJS))
+OBJS_P1AND4=$(patsubst %.o,objs_p1and4/%.o,$(OBJS))
 
-all: $(PLUGIN)
+.PHONY: objdirs
 
-$(PLUGIN): $(OBJS)
+all: objdirs $(PLUGIN) $(PLUGIN_P1AND4)
+
+objdirs:
+	mkdir -p objs objs_p1and4
+
+$(PLUGIN): $(OBJS_STD)
 	$(LD) -o $@ $^ $(LDFLAGS)
 
+$(PLUGIN_P1AND4): $(OBJS_P1AND4)
+	$(LD) -o $@ $^ $(LDFLAGS)
+
+objs/%.o: %.c
+	$(CC) $(CFLAGS) -c $^ -o $@
+
+objs_p1and4/%.o: %.c
+	$(CC) $(CFLAGS) -c $^ -o $@ -DPORTS_1_AND_4
+
 clean:
-	rm -vf $(PLUGIN) $(OBJS) *.d
+	rm -vf $(PLUGIN) $(PLUGIN_P1AND4) $(OBJS_STD) $(OBJS_P1ADN4) *.d
 
