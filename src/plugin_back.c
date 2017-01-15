@@ -34,6 +34,7 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 #include "plugin_back.h"
 #include "gcn64.h"
 #include "gcn64lib.h"
@@ -83,6 +84,7 @@ struct rawChannel {
 	struct adapter *adapter;
 	int chn;
 };
+
 /* Multiple adapters are supported, some are single player, others
  * two-player. As they are discovered during scan, their
  * channels (corresponding to physical controller ports) are added
@@ -100,7 +102,7 @@ int pb_init(pb_debugFunc debugFn)
 	return 0;
 }
 
-int pb_shutdown(void)
+static void pb_freeAllAdapters(void)
 {
 	int i;
 
@@ -109,14 +111,20 @@ int pb_shutdown(void)
 			/* RomClosed() should have done this, but just
 			   in case it is not always called, do this again here. */
 			gcn64lib_suspendPolling(g_adapters[i].handle, 0);
-
 			gcn64_closeDevice(g_adapters[i].handle);
 		}
 	}
 
-	gcn64_shutdown();
 	g_n_channels = 0;
 	g_n_adapters = 0;
+	memset(g_adapters, 0, sizeof(g_adapters));
+	memset(g_channels, 0, sizeof(g_channels));
+}
+
+int pb_shutdown(void)
+{
+	pb_freeAllAdapters();
+	gcn64_shutdown();
 
 	return 0;
 }
@@ -136,6 +144,12 @@ int pb_scanControllers(void)
 		return 0;
 	}
 
+	/* This may be called many times in the plugin's lifetime. For instance, each
+	 * time a new game is selected from the PJ64 menu. Freeing previously found
+	 * adapters here and creating a new list makes it possible to disconnect/replace
+	 * USB adapters without having to restart PJ64. */
+	pb_freeAllAdapters();
+
 	/* Pass 1: Fill g_adapters[] with the adapters present on the system. */
 	g_n_adapters = 0;
 	adap = &g_adapters[g_n_adapters];
@@ -147,9 +161,9 @@ int pb_scanControllers(void)
 			continue;
 		}
 
-		DebugMessage(PB_MSG_INFO, "Found USB device 0x%04x:0x%04x serial '%ls' name '%ls'",
+		DebugMessage(PB_MSG_INFO, "Found USB device 0x%04x:0x%04x serial '%ls' name '%ls'\n",
 						adap->inf.usb_vid, adap->inf.usb_pid, adap->inf.str_serial, adap->inf.str_prodname);
-		DebugMessage(PB_MSG_INFO, "Adapter supports %d raw channels", adap->inf.caps.n_raw_channels);
+		DebugMessage(PB_MSG_INFO, "Adapter supports %d raw channel(s)\n", adap->inf.caps.n_raw_channels);
 
 		g_n_adapters++;
 		if (g_n_adapters >= MAX_ADAPTERS)
@@ -160,7 +174,7 @@ int pb_scanControllers(void)
 	gcn64_freeListCtx(lctx);
 
 	/* Pass 2: Fill the g_channel[] array with the available raw channels.
-	 * For instance, if there are adapter A, B and C (where A and C are single-player
+	 * For instance, if there are adapters A, B and C (where A and C are single-player
 	 * and B is dual-player), we get this:
 	 *
 	 * [0] = Adapter A, raw channel 0
@@ -181,7 +195,7 @@ int pb_scanControllers(void)
 			}
 			g_channels[g_n_channels].adapter = adap;
 			g_channels[g_n_channels].chn = j;
-			DebugMessage(PB_MSG_INFO, "Channel %d: Adapter '%ls' raw channel %d", g_n_channels, adap->inf.str_serial, j);
+			DebugMessage(PB_MSG_INFO, "Channel %d: Adapter '%ls' raw channel %d\n", g_n_channels, adap->inf.str_serial, j);
 			g_n_channels++;
 		}
 	}
