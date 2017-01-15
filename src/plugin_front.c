@@ -41,6 +41,19 @@ typedef struct _EMULATOR_INFO
 	LANGID Language;
 } EMULATOR_INFO, *LPEMULATOR_INFO;
 
+#define MAX_CONTROLLERS	4
+
+#ifdef PORTS_1_AND_4
+/* The VRU should be in port 4. On a dual-port adapter, this routes
+ * the 2nd physical port to what the emulator sees as the 4th port. */
+static int emu2adap_portmap[MAX_CONTROLLERS] = { 0, 2, 3, 1 };
+#undef PLUGIN_NAME
+#define PLUGIN_NAME "raphnetraw ports 1 and 4"
+#else
+static int emu2adap_portmap[MAX_CONTROLLERS] = { 0, 1, 2, 3 };
+#endif
+
+#define EMU_2_ADAP_PORT(a)     ((a) == -1 ? -1 : emu2adap_portmap[a])
 
 EMULATOR_INFO g_strEmuInfo;			// emulator info?  Stores stuff like our hWnd handle and whether the plugin is initialized yet
 
@@ -166,7 +179,7 @@ EXPORT void CALL InitiateControllers( void *hMainWindow, CONTROL Controls[4])
 EXPORT void CALL InitiateControllers( CONTROL_INFO ControlInfo)
 #endif
 {
-	int i, n_controllers;
+	int i, n_controllers, adap_port;
 
 	if( !prepareHeap())
 		return;
@@ -191,14 +204,18 @@ EXPORT void CALL InitiateControllers( CONTROL_INFO ControlInfo)
 
 	EnterCriticalSection( &g_critical );
 
-	for (i=0; i<n_controllers; i++) {
+	for (i=0; i<MAX_CONTROLLERS; i++) {
+		adap_port = EMU_2_ADAP_PORT(i);
+
+		if (adap_port < n_controllers) {
 #if (SPECS_VERSION < 0x0101)
-		Controls[i].RawData = 1;
-		Controls[i].Present = 1;
+			Controls[i].RawData = 1;
+			Controls[i].Present = 1;
 #else
-		ControlInfo.Controls[i].RawData = 1;
-		ControlInfo.Controls[i].Present = 1;
+			ControlInfo.Controls[i].RawData = 1;
+			ControlInfo.Controls[i].Present = 1;
 #endif
+		}
 	}
 
 	g_strEmuInfo.fInitialisedPlugin = 1;
@@ -226,13 +243,13 @@ EXPORT void CALL GetKeys(int Control, BUTTONS * Keys )
 
 EXPORT void CALL ControllerCommand( int Control, BYTE * Command)
 {
-	pb_controllerCommand(Control, Command);
+	pb_controllerCommand(EMU_2_ADAP_PORT(Control), Command);
 }
 
 EXPORT void CALL ReadController( int Control, BYTE * Command )
 {
 	EnterCriticalSection( &g_critical );
-	pb_readController(Control, Command);
+	pb_readController(EMU_2_ADAP_PORT(Control), Command);
 	LeaveCriticalSection( &g_critical );
 }
 
