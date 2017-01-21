@@ -205,7 +205,7 @@ EXPORT void CALL InitiateControllers( CONTROL_INFO ControlInfo)
 
 	if (n_controllers <= 0) {
 		DebugMessage(M64MSG_ERROR, "No adapters detected.\n");
-		MessageBox( g_strEmuInfo.hMainWindow, "raphnetraw: Adapter not detected", "Warning", MB_OK | MB_ICONWARNING);
+		MessageBox( g_strEmuInfo.hMainWindow, "raphnetraw: Adapter not detected.\n\nIf the adapter management tool is running,\nclose it.", "Warning", MB_OK | MB_ICONWARNING);
 		return;
 	}
 
