@@ -41,6 +41,7 @@ cd .. # exit src
 
 cp src/pj64raphnetraw.dll -v $RELEASEDIR/$DIRNAME
 cp src/pj64raphnetraw_ports1and4.dll -v $RELEASEDIR/$DIRNAME
+cp src/pj64raphnetraw_ports1and3.dll -v $RELEASEDIR/$DIRNAME
 cp ../hidapi/windows/.libs/*.dll -v $RELEASEDIR/$DIRNAME
 cp README.md -rv $RELEASEDIR/$DIRNAME
 cp README.md -rv $RELEASEDIR/$DIRNAME/readme.txt

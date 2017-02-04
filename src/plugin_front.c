@@ -50,7 +50,15 @@ static int emu2adap_portmap[MAX_CONTROLLERS] = { 0, 2, 3, 1 };
 #undef PLUGIN_NAME
 #define PLUGIN_NAME "raphnetraw ports 1 and 4"
 #else
+#ifdef PORT_1_AND_3
+/* The Densha de GO controller should be in port 3. On a dual-port adapter,
+ * this routes the 2nd physical port to what the emulator sees as the 4th port. */
+static int emu2adap_portmap[MAX_CONTROLLERS] = { 0, 2, 1, 3 };
+#undef PLUGIN_NAME
+#define PLUGIN_NAME "raphnetraw ports 1 and 3"
+#else
 static int emu2adap_portmap[MAX_CONTROLLERS] = { 0, 1, 2, 3 };
+#endif
 #endif
 
 #define EMU_2_ADAP_PORT(a)     ((a) == -1 ? -1 : emu2adap_portmap[a])
