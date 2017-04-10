@@ -61,6 +61,11 @@ static int emu2adap_portmap[MAX_CONTROLLERS] = { 0, 1, 2, 3 };
 #endif
 #endif
 
+#ifdef PORT_1_ONLY
+#undef PLUGIN_NAME
+#define PLUGIN_NAME "raphnetraw port 1 only"
+#endif
+
 #define EMU_2_ADAP_PORT(a)     ((a) == -1 ? -1 : emu2adap_portmap[a])
 
 EMULATOR_INFO g_strEmuInfo;			// emulator info?  Stores stuff like our hWnd handle and whether the plugin is initialized yet
