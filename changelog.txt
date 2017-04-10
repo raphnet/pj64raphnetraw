@@ -1,3 +1,6 @@
+2016-02-04: Version 1.0.1
+	- Add a ports 1 and 3 build (for the Densha de GO! controller)
+
 2017-01-15: Version 1.0.0
     - Add multiple adapter support
 	- Add a special build where adapter port 2 equals N64 port 4 (for VRU)
