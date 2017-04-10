@@ -1,4 +1,8 @@
-2016-02-04: Version 1.0.1
+2017-04-10: Version 1.0.2
+	- Add a single-port version (improves dual-port adapter performance
+	  in some situations by not attempting to poll non-connected controllers)
+
+2017-02-04: Version 1.0.1
 	- Add a ports 1 and 3 build (for the Densha de GO! controller)
 
 2017-01-15: Version 1.0.0

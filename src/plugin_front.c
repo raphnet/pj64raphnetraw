@@ -195,6 +195,7 @@ EXPORT void CALL InitiateControllers( CONTROL_INFO ControlInfo)
 #endif
 {
 	int i, n_controllers, adap_port;
+	BOOL present;
 
 	if( !prepareHeap())
 		return;
@@ -223,14 +224,23 @@ EXPORT void CALL InitiateControllers( CONTROL_INFO ControlInfo)
 		adap_port = EMU_2_ADAP_PORT(i);
 
 		if (adap_port < n_controllers) {
-#if (SPECS_VERSION < 0x0101)
-			Controls[i].RawData = 1;
-			Controls[i].Present = 1;
-#else
-			ControlInfo.Controls[i].RawData = 1;
-			ControlInfo.Controls[i].Present = 1;
-#endif
+			present = 1;
+		} else {
+			present = 0;
 		}
+
+#ifdef PORT_1_ONLY
+		if (i>0)
+			present = 0;
+#endif
+
+#if (SPECS_VERSION < 0x0101)
+		Controls[i].RawData = present;
+		Controls[i].Present = present;
+#else
+		ControlInfo.Controls[i].RawData = present;
+		ControlInfo.Controls[i].Present = present;
+#endif
 	}
 
 	g_strEmuInfo.fInitialisedPlugin = 1;
