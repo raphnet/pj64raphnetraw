@@ -1,6 +1,8 @@
 2017-04-10: Version 1.0.2
 	- Add a single-port version (improves dual-port adapter performance
 	  in some situations by not attempting to poll non-connected controllers)
+	- Add a netplay version. (Single player only. Hopefully this one will work
+	  with the newest firmware)
 
 2017-02-04: Version 1.0.1
 	- Add a ports 1 and 3 build (for the Densha de GO! controller)
