@@ -50,7 +50,7 @@ static int emu2adap_portmap[MAX_CONTROLLERS] = { 0, 2, 3, 1 };
 #undef PLUGIN_NAME
 #define PLUGIN_NAME "raphnetraw ports 1 and 4"
 #else
-#ifdef PORT_1_AND_3
+#ifdef PORTS_1_AND_3
 /* The Densha de GO controller should be in port 3. On a dual-port adapter,
  * this routes the 2nd physical port to what the emulator sees as the 4th port. */
 static int emu2adap_portmap[MAX_CONTROLLERS] = { 0, 2, 1, 3 };
@@ -64,6 +64,11 @@ static int emu2adap_portmap[MAX_CONTROLLERS] = { 0, 1, 2, 3 };
 #ifdef PORT_1_ONLY
 #undef PLUGIN_NAME
 #define PLUGIN_NAME "raphnetraw port 1 only"
+#endif
+
+#ifdef NO_BLOCK_IO
+#undef PLUGIN_NAME
+#define PLUGIN_NAME "raphnetraw 1 player NET version"
 #endif
 
 #define EMU_2_ADAP_PORT(a)     ((a) == -1 ? -1 : emu2adap_portmap[a])
@@ -159,8 +164,14 @@ EXPORT void CALL GetDllInfo ( PLUGIN_INFO* PluginInfo )
 EXPORT void CALL DllAbout ( HWND hParent )
 {
 	char tmpbuf[512];
-#ifdef PORTS_1_AND_4
+#if defined(PORTS_1_AND_4)
 	const char *specialBuild = "\n* * * Special build * * *\nAdapter ports 1 and 2 -> N64 ports 1 and 4\n(For use with VRU in port 4 with two-player adapter)\n";
+#elif defined(PORTS_1_AND_3)
+	const char *specialBuild = "\n* * * Special build * * *\nAdapter ports 1 and 2 -> N64 ports 1 and 3\n(For Densha de GO!)\n";
+#elif defined(NO_BLOCK_IO)
+	const char *specialBuild = "\n* * * Special build * * *\nNET version\n(For playing online)\n";
+#elif defined(PORT_1_ONLY)
+	const char *specialBuild = "\n* * * Special build * * *\nAdapter port 1 only\n(For maximum performance)\n";
 #else
 	const char *specialBuild = "Standard version";
 #endif
