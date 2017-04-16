@@ -1,3 +1,7 @@
+2016-04-16: Version 1.0.3
+	- Fix ports 1 and 3 special version
+	- Another attempt to fix netplay (version 1.0.2 did not work)
+
 2017-04-10: Version 1.0.2
 	- Add a single-port version (improves dual-port adapter performance
 	  in some situations by not attempting to poll non-connected controllers)
