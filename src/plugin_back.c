@@ -436,7 +436,11 @@ int pb_readController(int Control, unsigned char *Command)
 
 	// Called with -1 at the end of PIF ram.
 	if (Control == -1) {
+#ifndef NO_BLOCK_IO
 		return pb_performIo();
+#else
+		return 0;
+#endif
 	}
 
 	/* Check for out of bounds Control parameter, for
@@ -469,6 +473,12 @@ int pb_readController(int Control, unsigned char *Command)
 
 		adap->n_ops++;
 	}
+
+#ifdef NO_BLOCK_IO
+	/* When BLOCKIO is diabled, every call to pb_readController results
+	 * in an immediate exchange with the controller. Required for netplay. */
+	pb_performIo();
+#endif
 
 	return 0;
 }

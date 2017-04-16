@@ -360,10 +360,6 @@ int gcn64lib_blockIO(gcn64_hdl_t hdl, struct blockio_op *iops, int n_iops)
 	if (!hdl)
 		return -1;
 
-#ifdef NO_BLOCK_IO
-	return gcn64lib_blockIO_compat(hdl, iops, n_iops);
-#endif
-
 	if (!hdl->caps.bio_support) {
 		return gcn64lib_blockIO_compat(hdl, iops, n_iops);
 	}
