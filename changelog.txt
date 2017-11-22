@@ -1,4 +1,8 @@
-2016-04-16: Version 1.0.3
+2017-11-22: Version 1.0.4
+	- Add support for the upcoming 3.5.x adapter firmware (2-player adapters
+	  won't work properly otherwise)
+
+2017-04-16: Version 1.0.3
 	- Fix ports 1 and 3 special version
 	- Another attempt to fix netplay (version 1.0.2 did not work)
 
