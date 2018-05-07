@@ -114,7 +114,10 @@ EXPORT BOOL APIENTRY DllMain( HINSTANCE hModule, DWORD  ul_reason_for_call, LPVO
 			return FALSE;
 
 		sprintf(logfilename, "%s\\%s\\raphnetraw.log", getenv("homedrive"), getenv("homepath"));
+		logfptr = NULL;
+#ifdef WITH_DEBUG_LOG
 		logfptr = fopen(logfilename, "act");
+#endif
 
 		DebugWriteA("*** DLL Attach | built on " __DATE__ " at " __TIME__")\n");
 		ZeroMemory( &g_strEmuInfo, sizeof(g_strEmuInfo) );
