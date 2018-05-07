@@ -65,8 +65,17 @@
 static void nodebug(int l, const char *m, ...) { }
 
 static pb_debugFunc DebugMessage = nodebug;
+#define printf(fmt, ...) DebugMessage(PB_MSG_INFO, fmt, ##__VA_ARGS__)
 
+static void Debug_printHexBuf(unsigned char *buf, int n)
+{
+	int i;
 
+	for (i=0; i<n; i++) {
+		printf("%02x ", buf[i]);
+	}
+	printf("\n");
+}
 
 #define MAX_OPS	64
 
@@ -318,7 +327,7 @@ static int pb_performIo(void)
 				continue;
 			printf("Before blockIO: op %d, chn: %d, : tx: 0x%02x, rx: 0x%02x, data: ", i, biops[i].chn,
 						biops[i].tx_len, biops[i].rx_len);
-			printHexBuf(biops[i].tx_data, biops[i].tx_len);
+			Debug_printHexBuf(biops[i].tx_data, biops[i].tx_len);
 		}
 #endif
 
@@ -350,7 +359,7 @@ static int pb_performIo(void)
 				} else if (biops[i].rx_len & BIO_RX_LEN_PARTIAL) {
 					printf("Incomplete\n");
 				} else {
-					printHexBuf(biops[i].rx_data, biops[i].rx_len);
+					Debug_printHexBuf(biops[i].rx_data, biops[i].rx_len);
 				}
 #endif
 			}
