@@ -377,6 +377,9 @@ static int pb_performIo(void)
 
 static int pb_commandIsValid(int Control, unsigned char *Command)
 {
+/*	printf("pb_commandIsValid: ");
+	Debug_printHexBuf(Command, 6);
+	printf("\n");*/
 	if (Control < 0 || Control >= g_n_channels) {
 		DebugMessage(PB_MSG_WARNING, "pb_readController called with Control=%d\n", Control);
 		return 0;
