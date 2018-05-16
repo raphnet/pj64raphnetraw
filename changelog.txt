@@ -1,3 +1,8 @@
+2018-05-16: Version 1.0.5
+    - Add protection against invalid commands (Fixes controller pak errors
+	  when using more than one)
+    - Disabled logging (slight increase in performance)
+
 2017-11-22: Version 1.0.4
 	- Add support for the upcoming 3.5.x adapter firmware (2-player adapters
 	  won't work properly otherwise)
