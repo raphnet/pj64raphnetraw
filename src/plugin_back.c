@@ -434,6 +434,20 @@ static int pb_commandIsValid(int Control, unsigned char *Command)
 		return 0;
 	}
 
+	// Strange command in Battle Tanx, on dual port adapters. Only in project64...
+	//
+	//  TX RX Data[...]
+	//	01 fe 00
+	//
+	// In other words: Send a zero to controller 1, then receive 0xfe (254) bytes!
+	// Controllers only return 3 bytes to command 0... But that's not all. The
+	// answer (254 bytes) would not even fit in the PIF ram.
+	//
+	if (Command[1] > 64) {
+		DebugMessage(PB_MSG_WARNING, "Ignoring invalid command (rx > 64)");
+		return 0;
+	}
+
 	return 1;
 }
 
