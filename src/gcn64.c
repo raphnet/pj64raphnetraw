@@ -61,6 +61,13 @@ static struct supported_adapter supported_adapters[] = {
 	{ OUR_VENDOR_ID, 0x003C, 2, { 2, 1 } }, // (2x N64-only mode)
 	{ OUR_VENDOR_ID, 0x003D, 2, { 2, 1 } }, // (2x GC-only mode)
 
+	// GC/N64 USB v3.6.x flavours
+	{ OUR_VENDOR_ID, 0x0060, 1, { 1, 1 } }, // (GC/N64 mode)
+	{ OUR_VENDOR_ID, 0x0061, 1, { 1, 1 } }, // (N64 mode)
+	{ OUR_VENDOR_ID, 0x0063, 2, { 2, 1 } }, // (2x GC/N64 mode)
+	{ OUR_VENDOR_ID, 0x0064, 2, { 2, 1 } }, // (2x N64-only mode)
+	{ OUR_VENDOR_ID, 0x0067, 1, { 1, 1 } }, // (GC/N64 in GC keyboard mode)
+
 	{ }, // terminator
 };
 
