@@ -1,3 +1,6 @@
+2018-11-06: Version 1.0.6
+	- Add support for adapter firmware version 3.6.x
+
 2018-05-16: Version 1.0.5
     - Add protection against invalid commands (Fixes controller pak errors
 	  when using more than one)
