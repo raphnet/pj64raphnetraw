@@ -191,13 +191,34 @@ EXPORT void CALL DllAbout ( HWND hParent )
 	return;
 }
 
-#if 0
 EXPORT void CALL DllConfig ( HWND hParent )
 {
+	char tmpbuf[512];
+	int n_controllers;
+
+	if( !prepareHeap())
+		return;
+
+	pb_init(DebugMessage);
+	n_controllers = pb_scanControllers();
+
+	if (n_controllers <= 0) {
+		DebugMessage(M64MSG_ERROR, "No adapters detected.\n");
+		MessageBox( hParent, "raphnetraw: Adapter not detected.\n\nIf the adapter management tool is running,\nclose it.", "Warning", MB_OK | MB_ICONWARNING);
+		return;
+	}
+
 	DebugWriteA("CALLED: DllConfig\n");
+
+	snprintf(tmpbuf, sizeof(tmpbuf),
+					"No calibration or configuration required.\n"
+					"The controller will work, respond and feel exactly as it would in real life.\n\n"
+					"Controller ports detected: %d", n_controllers);
+
+	MessageBox( hParent, tmpbuf, "Raphnetraw Configuration", MB_OK | MB_ICONINFORMATION);
+
 	return;
 }
-#endif
 
 #if 0
 EXPORT void CALL DllTest ( HWND hParent )
