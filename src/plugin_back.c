@@ -446,8 +446,8 @@ static int pb_commandIsValid(int Control, unsigned char *Command)
 	// Controllers only return 3 bytes to command 0... But that's not all. The
 	// answer (254 bytes) would not even fit in the PIF ram.
 	//
-	if (Command[1] > 64) {
-		DebugMessage(PB_MSG_WARNING, "Ignoring invalid command (rx > 64)");
+	if (Command[1] == 0xfe) {
+		DebugMessage(PB_MSG_WARNING, "Ignoring invalid command (rx = 0xfe)");
 		return 0;
 	}
 
