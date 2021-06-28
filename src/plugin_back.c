@@ -348,6 +348,10 @@ static int pb_performIo(void)
 				// occasion to use a negative array index ;)
 				biops[i].tx_data[-1] = biops[i].rx_len;
 
+		/*		if (biops[i].rx_len & BIO_RX_LEN_TIMEDOUT) {
+					biops[i].tx_data[-1] |= 0x80;
+				}*/
+
 #ifdef TRACE_BLOCK_IO
 				if (EXTENSION_RW_ONLY && (biops[i].tx_data[0] < 0x02))
 					continue;
