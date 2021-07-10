@@ -15,6 +15,7 @@ int pb_shutdown(void);
 int pb_scanControllers(void);
 int pb_readController(int Control, unsigned char *Command);
 int pb_controllerCommand(int Control, unsigned char *Command);
+int pb_getKeys(int Control, BUTTONS *Keys);
 int pb_romOpen(void);
 int pb_romClosed(void);
 
