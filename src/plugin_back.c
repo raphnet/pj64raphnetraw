@@ -35,9 +35,12 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <windows.h>
+#include "common.h"
 #include "plugin_back.h"
 #include "gcn64.h"
 #include "gcn64lib.h"
+#include "gcn64_protocol.h"
 #include "version.h"
 #include "hexdump.h"
 
@@ -509,6 +512,34 @@ int pb_readController(int Control, unsigned char *Command)
 	 * in an immediate exchange with the controller. Required for netplay. */
 	pb_performIo();
 #endif
+
+	return 0;
+}
+
+int pb_getKeys(int Control, BUTTONS *Keys)
+{
+	struct rawChannel *channel;
+	struct adapter *adap;
+	unsigned char getstatus[1] = { N64_GET_STATUS };
+	unsigned char status[4];
+	int res;
+
+	if (Control == -1) {
+		return 0;
+	}
+
+	channel = &g_channels[Control];
+	adap = channel->adapter;
+	res = gcn64lib_rawSiCommand(adap->handle, channel->chn, getstatus, sizeof(getstatus), status, sizeof(status));
+
+	if (res != 4) {
+		DebugMessage(PB_MSG_ERROR, "Unexpected data length\n");
+		return 0;
+	}
+
+	Keys->Value = ((unsigned long) status[1] << 8) | status[0];
+	Keys->X_AXIS = (signed char)(status[3]);
+	Keys->Y_AXIS = (signed char)(status[2]);
 
 	return 0;
 }

@@ -158,7 +158,11 @@ EXPORT BOOL APIENTRY DllMain( HINSTANCE hModule, DWORD  ul_reason_for_call, LPVO
 EXPORT void CALL GetDllInfo ( PLUGIN_INFO* PluginInfo )
 {
 	DebugWriteA("CALLED: GetDllInfo\n");
+#if defined(NO_PAK_SUPPORT)
+	sprintf(PluginInfo->Name,"%s version %d.%d.%d (No Pak Support)", PLUGIN_NAME, VERSION_PRINTF_SPLIT(PLUGIN_VERSION));
+#else
 	sprintf(PluginInfo->Name,"%s version %d.%d.%d", PLUGIN_NAME, VERSION_PRINTF_SPLIT(PLUGIN_VERSION));
+#endif
 
 	PluginInfo->Type = PLUGIN_TYPE_CONTROLLER;
 	PluginInfo->Version = SPECS_VERSION;
@@ -179,12 +183,18 @@ EXPORT void CALL DllAbout ( HWND hParent )
 	const char *specialBuild = "Standard version";
 #endif
 
+#if defined(NO_PAK_SUPPORT)
+	const char *pakSupport = " (No Controller Pak Support)";
+#else
+	const char *pakSupport = "";
+#endif
+
 	DebugWriteA("CALLED: DllAbout\n");
 
 	snprintf(tmpbuf, sizeof(tmpbuf),
 					PLUGIN_NAME" version %d.%d.%d (Compiled on "__DATE__")\n"
-					"%s\n"
-					"by raphnet\n", VERSION_PRINTF_SPLIT(PLUGIN_VERSION), specialBuild);
+					"%s%s\n"
+					"by raphnet\n", VERSION_PRINTF_SPLIT(PLUGIN_VERSION), specialBuild, pakSupport);
 
 	MessageBox( hParent, tmpbuf, "About", MB_OK | MB_ICONINFORMATION);
 
@@ -210,10 +220,18 @@ EXPORT void CALL DllConfig ( HWND hParent )
 
 	DebugWriteA("CALLED: DllConfig\n");
 
+#if defined(NO_PAK_SUPPORT)
+	snprintf(tmpbuf, sizeof(tmpbuf),
+					"No calibration or configuration required.\n"
+					"The controller will work, respond and feel exactly as it would in real life.\n\n"
+					"Controller pak support is disabled in this version.\n\n"
+					"Controller ports detected: %d", n_controllers);
+#else
 	snprintf(tmpbuf, sizeof(tmpbuf),
 					"No calibration or configuration required.\n"
 					"The controller will work, respond and feel exactly as it would in real life.\n\n"
 					"Controller ports detected: %d", n_controllers);
+#endif
 
 	MessageBox( hParent, tmpbuf, "Raphnetraw Configuration", MB_OK | MB_ICONINFORMATION);
 
@@ -235,7 +253,7 @@ EXPORT void CALL InitiateControllers( CONTROL_INFO ControlInfo)
 #endif
 {
 	int i, n_controllers, adap_port;
-	BOOL present;
+	BOOL present, rawdata;
 
 	if( !prepareHeap())
 		return;
@@ -274,11 +292,17 @@ EXPORT void CALL InitiateControllers( CONTROL_INFO ControlInfo)
 			present = 0;
 #endif
 
+#ifdef NO_PAK_SUPPORT
+		rawdata = 0;
+#else
+		rawdata = present;
+#endif
+
 #if (SPECS_VERSION < 0x0101)
-		Controls[i].RawData = present;
+		Controls[i].RawData = rawdata;
 		Controls[i].Present = present;
 #else
-		ControlInfo.Controls[i].RawData = present;
+		ControlInfo.Controls[i].RawData = rawdata;
 		ControlInfo.Controls[i].Present = present;
 #endif
 	}
@@ -304,6 +328,9 @@ EXPORT void CALL RomClosed(void)
 
 EXPORT void CALL GetKeys(int Control, BUTTONS * Keys )
 {
+	EnterCriticalSection( &g_critical );
+	pb_getKeys(EMU_2_ADAP_PORT(Control), Keys);
+	LeaveCriticalSection( &g_critical );
 }
 
 EXPORT void CALL ControllerCommand( int Control, BYTE * Command)
