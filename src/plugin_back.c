@@ -534,6 +534,7 @@ int pb_getKeys(int Control, BUTTONS *Keys)
 
 	if (res != 4) {
 		DebugMessage(PB_MSG_ERROR, "Unexpected data length\n");
+		Keys->Value = 0;
 		return 0;
 	}
 
